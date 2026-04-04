@@ -1,5 +1,5 @@
 # Bitirme_Projesi
-
+```
 havlu_takip_projesi/
 │
 ├── main.py                  # Web sunucusunu (Flask/FastAPI) başlatan ana dosya.
@@ -31,3 +31,4 @@ havlu_takip_projesi/
 └── data/                    # Test verileri
     ├── sample_video.mp4     # Hocanın attığı veya senin çektiğin test videoları.
     └── app.db               # SQLite veritabanı dosyası.
+```
