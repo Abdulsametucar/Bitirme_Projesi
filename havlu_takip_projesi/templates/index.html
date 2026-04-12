@@ -1,0 +1,34 @@
+{% extends 'base.html' %} {% block content %}
+<h2>Gün Sonu Özeti</h2>
+<div class="summary">
+  <div class="card">
+    <h3>Toplam Havlu</h3>
+    <p>{{ summary.total_towels }}</p>
+  </div>
+  <div class="card">
+    <h3>En İyi İşçi</h3>
+    <p>{{ summary.best_worker }} (Doğruluk: {{ summary.best_rate }}%)</p>
+  </div>
+</div>
+<div class="table-container">
+  <h3>İşçi Performansları</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>İşçi</th>
+        <th>Toplam</th>
+        <th>Doğru Katlama</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for name, stats in summary.worker_stats.items() %}
+      <tr>
+        <td>{{ name }}</td>
+        <td>{{ stats.count }}</td>
+        <td>{{ stats.correct }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
