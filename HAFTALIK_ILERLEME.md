@@ -18,8 +18,8 @@
 
 | Hafta | Tarih Aralığı | Planlanan İş | Tahmini Tamamlanma (%) | Durum |
 |-------|---------------|--------------|------------------------|-------|
-| 1 | 04.04 - 11.04 | Literatür araştırması, proje klasör yapısının (Flask/FastAPI, cv_engine, db) kurulması ve test videolarının ayarlanması. | %10 | 🔄 Devam Ediyor |
-| 2 | 11.04 - 18.04 | Görüntü bölütleme (segmentasyon) algoritmalarının (Canny, Sobel, Prewitt, K-Means, DBSCAN vb.) test scripti ile karşılaştırılması ve en verimli yöntemin seçilmesi. | %20 | ⬜ Başlamadı |
+| 1 | 04.04 - 11.04 | Literatür araştırması, proje klasör yapısının (Flask/FastAPI, cv_engine, db) kurulması ve test video ve fotoğraflarının ayarlanması. | %10 | ✅ Tamamlandı |
+| 2 | 11.04 - 18.04 | Görüntü bölütleme (segmentasyon) algoritmalarının (Canny, Sobel, Prewitt, K-Means, DBSCAN vb.) test scripti ile karşılaştırılması ve en verimli yöntemin seçilmesi. | %20 | 🔄 Devam Ediyor |
 | 3 | 25.04 - 02.05 | Seçilen algoritma ile `detector.py` modülünün yazılması. Görüntüden havlunun ayrılması, Bounding Box (sınırlayıcı kutu) ve X/Y boyutlarının anlık hesaplanması. | %30 | ⬜ Başlamadı |
 | 4 | 02.05 - 09.05 | Katlama adımlarını oransal (%15, %33, %50 vb.) olarak takip edecek Durum Makinesi (State Machine) mantığının `tracker.py` içerisine kodlanması. | %40 | ⬜ Başlamadı |
 | 5 | 09.05 - 16.05 | Zaman ölçüm metriklerinin sisteme entegre edilmesi. Her bir katlama aşamasının ve toplam işlemin ne kadar sürdüğünün ölçülmesi. Doğru katlama / hatalı katlama karar mantığının oluşturulması. | %50 | ⬜ Başlamadı |
@@ -47,9 +47,13 @@
 **Bu hafta yaptıklarım:**
 - Proje kapsamı danışman hocalarla netleştirildi ve MVP (Minimum Viable Product) hedefleri belirlendi.
 - Derin öğrenme yerine geleneksel görüntü işleme metotları (Canny, Sobel, eşikleme vb.) kullanılması kararlaştırıldı.
+- Literatür araştırması yapılarak projeler incelendi.
+  [https://www.frontiersin.org/journals/robotics-and-ai/articles/10.3389/frobt.2026.1752914/full], 
+  [https://people.eecs.berkeley.edu/~pabbeel/papers/Maitin-ShepardCusumano-TownerLeiAbbeel_ICRA2010.pdf],
+  [https://publications.ri.cmu.edu/storage/publications/2021/08/MSR_Thesis_SujayBajracharya.pdf]
 - Projenin `main.py`, `cv_engine`, `database`, `static` ve `templates` mimarisinden oluşan modüler klasör yapısı oluşturuldu.
-- Sistemin üzerinde çalışacağı örnek referans havlu katlama videosu indirildi ve test klasörüne (`data/sample_video.mp4`) eklendi.
-
+- Sistemin üzerinde çalışacağı referans havlu katlama videosu indirildi. Kendi ürettiğim video ve fotoğraflar test klasörüne (`data/sample_video.mp4`) eklendi.
+  
 **Plana göre durumum:**
 - Hedeflere ulaşıldı, planlanan takvime uygun ilerliyorum.
 
