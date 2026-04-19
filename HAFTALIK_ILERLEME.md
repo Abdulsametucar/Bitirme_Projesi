@@ -39,6 +39,28 @@
 
 ---
 
+### Hafta 2 *(Tarih: 11.04.2026 - 18.04.2026)*
+
+**Plandaki hedef:**
+- Görüntü bölütleme (segmentasyon) algoritmalarının (Canny, Sobel, Prewitt, K-Means, DBSCAN vb.) test scripti ile karşılaştırılması ve en verimli yöntemin seçilmesi.
+
+**Bu hafta yaptıklarım:**
+- Görüntü bölütleme algoritmalarını (Sobel, Canny, K-Means) aynı video karesi üzerinde eşzamanlı çalıştırarak yan yana karşılaştırmayı sağlayan bir Python test scripti geliştirildi.
+- Temel eşikleme (Thresholding), Uyarlanabilir eşikleme (Adaptive Thresholding) ve HSV renk uzayı maskelemesi yöntemleri test edildi. Ortam ışığındaki değişimlerin ve havlu dokusunun maskede kopukluklara yol açtığı gözlemlendi.
+- K-Means kümeleme algoritmasının temiz sonuç vermesine rağmen gerçek zamanlı (FPS) video işleme için çok yavaş kaldığı; Sobel operatörünün ise havlunun iç dokusundaki kırışıklıkları (gürültüyü) fazlasıyla algıladığı tespit edildi.
+- Hız, işlemci yükü ve kenar netliği (dış çerçeve temizliği) metrikleri göz önüne alındığında, projede ana tespit yöntemi olarak **Canny Kenar Bulma (Canny Edge Detection)** algoritmasının kullanılmasına karar verildi.
+
+**Plana göre durumum:**
+- Hedeflere ulaşıldı, algoritma seçimi aşaması takvime uygun olarak başarıyla tamamlandı.
+
+**Karşılaştığım sorunlar / zorluklar:**
+- Havlunun üzerindeki doku farkları ve katlama sırasındaki kırışıklıklar, algoritmaların havluyu tek parça yerine çok sayıda küçük parça olarak algılamasına neden oldu. Bu sorunu aşmak için Canny algoritmasının eşik değerlerinin (hysteresis) ortama göre optimize edilmesi gerektiği anlaşıldı.
+
+**Gelecek hafta hedefim:**
+- Seçilen Canny algoritması ve morfolojik işlemler kullanılarak `detector.py` modülünün yazılması.
+- Görüntüden havlunun tamamen ayrıştırılarak "solid (katı) maske" elde edilmesi ve Bounding Box üzerinden anlık X/Y ekseni genişlik/yükseklik hesaplamalarının yapılması.
+  
+
 ### Hafta 1 *(Tarih: 04.04.2026 - 11.04.2026)*
 
 **Plandaki hedef:**
