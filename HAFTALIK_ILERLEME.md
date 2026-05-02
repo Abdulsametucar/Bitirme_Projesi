@@ -19,10 +19,10 @@
 | Hafta | Tarih Aralığı | Planlanan İş | Tahmini Tamamlanma (%) | Durum |
 |-------|---------------|--------------|------------------------|-------|
 | 1 | 04.04 - 11.04 | Literatür araştırması, proje klasör yapısının (Flask/FastAPI, cv_engine, db) kurulması ve test video ve fotoğraflarının ayarlanması. | %10 | ✅ Tamamlandı |
-| 2 | 11.04 - 18.04 | Görüntü bölütleme (segmentasyon) algoritmalarının (Canny, Sobel, Prewitt, K-Means, DBSCAN vb.) test scripti ile karşılaştırılması ve en verimli yöntemin seçilmesi. | %20 | 🔄 Devam Ediyor |
-| 3 | 25.04 - 02.05 | Seçilen algoritma ile `detector.py` modülünün yazılması. Görüntüden havlunun ayrılması, Bounding Box (sınırlayıcı kutu) ve X/Y boyutlarının anlık hesaplanması. | %30 | ⬜ Başlamadı |
-| 4 | 02.05 - 09.05 | Katlama adımlarını oransal (%15, %33, %50 vb.) olarak takip edecek Durum Makinesi (State Machine) mantığının `tracker.py` içerisine kodlanması. | %40 | ⬜ Başlamadı |
-| 5 | 09.05 - 16.05 | Zaman ölçüm metriklerinin sisteme entegre edilmesi. Her bir katlama aşamasının ve toplam işlemin ne kadar sürdüğünün ölçülmesi. Doğru katlama / hatalı katlama karar mantığının oluşturulması. | %50 | ⬜ Başlamadı |
+| 2 | 11.04 - 18.04 | Görüntü bölütleme (segmentasyon) algoritmalarının (Canny, Sobel, Prewitt, K-Means, DBSCAN vb.) test scripti ile karşılaştırılması ve en verimli yöntemin seçilmesi. | %20 | ✅ Tamamlandı |
+| 3 | 25.04 - 02.05 | Seçilen algoritma ile `detector.py` modülünün yazılması. Görüntüden havlunun ayrılması, Bounding Box (sınırlayıcı kutu) ve X/Y boyutlarının anlık hesaplanması. | %30 | ✅ Tamamlandı |
+| 4 | 02.05 - 09.05 | Katlama adımlarını oransal (%15, %33, %50 vb.) olarak takip edecek Durum Makinesi (State Machine) mantığının `tracker.py` içerisine kodlanması. | %40 | ✅ Tamamlandı |
+| 5 | 09.05 - 16.05 | Zaman ölçüm metriklerinin sisteme entegre edilmesi. Her bir katlama aşamasının ve toplam işlemin ne kadar sürdüğünün ölçülmesi. Doğru katlama / hatalı katlama karar mantığının oluşturulması. | %50 | 🔄 Devam Ediyor |
 | 6 | 16.05 - 23.05 | `database` modülünün ayarlanması. SQLite/PostgreSQL veritabanı tablolarının (İşçi, Havlu_Islemi, Adimlar) oluşturulması ve CRUD operasyonlarının yazılması. | %60 | ⬜ Başlamadı |
 | 7 | 30.05 - 06.06 | Görüntü işleme motoru (CV Engine) ile veritabanının birbirine bağlanması. İşlenen verilerin anlık olarak veritabanına kaydedilmesi. | %70 | ⬜ Başlamadı |
 | 8 | 06.06 - 13.06 | Web uygulamasının backend (main.py) ve frontend (HTML/CSS/JS) iskeletinin ayağa kaldırılması. `live_feed.html` üzerinden kamera/video akışının webe aktarılması. | %80 | ⬜ Başlamadı |
@@ -38,6 +38,70 @@
 > **Kullanım:** Her hafta aşağıdaki şablonu kopyalayıp doldurun. En güncel hafta en üstte olacak şekilde ekleyin.
 
 ---
+
+### Hafta 5 *(Tarih: 09.05.2026 - 16.05.2026)*
+
+**Plandaki hedef:**
+- Zaman ölçüm metriklerinin sisteme entegre edilmesi. Her bir katlama aşamasının ve toplam işlemin ne kadar sürdüğünün ölçülmesi. Doğru katlama / hatalı katlama karar mantığının oluşturulması.
+
+**Bu hafta yaptıklarım:**
+- `tracker.py` içerisindeki durum makinesine (State Machine) `time` modülü entegre edildi. Her bir katlama aşamasının (State) geçiş süresi ve işin başlangıcından bitişine kadar geçen toplam süre saniye cinsinden hesaplanarak raporlandı.
+- Adımlar arası geçişlerde "Doğru Katlama" ve "Hatalı Katlama" (örn: adım atlama, ters yönden katlama) senaryoları test edildi ve karar mantığı oturtuldu.
+- İşlem tamamlanma koşulu güncellendi: `tracker.py` içerisindeki State 3 mantığı "alttan üste doğru" katlama senaryosuna göre güncellendi. State 5 (Final) için gereksiz bekleme süresi kaldırılarak, boyutlar hedefe ulaştığında sistemin doğrudan "BAŞARILI" sonucunu döndürmesi sağlandı.
+- `main.py` içerisindeki video oynatma döngüsüne dinamik FPS hesaplaması (`delay = int(1000 / fps)`) eklenerek analiz sürecinin gerçek hızında (1x) çalışması sağlandı.
+
+**Plana göre durumum:**
+- Hedeflere tam anlamıyla ulaşıldı. 3., 4. ve 5. haftanın görevleri yoğun bir çalışma ile birleştirilerek tamamlandığı için proje takviminin yaklaşık 2 hafta önünde ilerliyorum.
+
+**Karşılaştığım sorunlar / zorluklar:**
+- Sonuç ekranında video akışının asenkron olması ve ağır çekimde oynatılması sorunu yaşandı. Görüntü okuma gecikmesi videonun kendi FPS değerine senkronize edilerek çözüldü.
+
+**Gelecek hafta hedefim:**
+- `database` modülünün ayarlanması. Veritabanı tablolarının (İşçi, Havlu_Islemi, Adimlar) oluşturulması ve CRUD operasyonlarının yazılması.
+
+---
+
+### Hafta 4 *(Tarih: 02.05.2026 - 09.05.2026)*
+
+**Plandaki hedef:**
+- Katlama adımlarını oransal (%15, %33, %50 vb.) olarak takip edecek Durum Makinesi (State Machine) mantığının `tracker.py` içerisine kodlanması.
+
+**Bu hafta yaptıklarım:**
+- `tracker.py` modülü kodlanarak, `detector.py`'den anlık olarak gelen X, Y, Genişlik (W) ve Yükseklik (H) verilerini işleyen 5 aşamalı bir Durum Makinesi (State Machine) oluşturuldu.
+- Senaryoya uygun olarak; sağdan %15, üstten %33, alttan %50 gibi belirlenen oranlar ile havlunun boyut küçülmeleri eşleştirildi.
+- Beklenmeyen bir eksende daralma olduğunda veya adımlar arasında atlama yapıldığında sürecin iptal edilip hatayı loglayan bir yapı geliştirildi.
+
+**Plana göre durumum:**
+- Hızlı bir ilerleme kaydedildi, planlanan işler takvimin ilerisinde tamamlandı.
+
+**Karşılaştığım sorunlar / zorluklar:**
+- **Oklüzyon (Kapanma) Sorunu:** İşçinin kolları ve elleri katlama esnasında kadraja girdiğinde, sistem kolları havlunun bir parçası zannederek sınırlayıcı kutuyu (Bounding Box) aniden büyüttü. Bu da sistemin "Yanlış Eksen (h_drift)" hatası fırlatmasına neden oldu.
+- **Çözüm:** State Machine içerisine bir "Debounce (Stabilizasyon)" mantığı yazıldı. Yeni boyutların geçerli sayılabilmesi için hareketin bitmesi ve boyutların belirli bir frame/saniye boyunca sabit kalması şartı eklendi.
+
+**Gelecek hafta hedefim:**
+- Zaman ölçüm metriklerinin sisteme entegre edilmesi ve hata/başarı durumlarının raporlanabilir hale getirilmesi.
+
+---
+
+### Hafta 3 *(Tarih: 25.04.2026 - 02.05.2026)*
+
+**Plandaki hedef:**
+- Seçilen algoritma ile `detector.py` modülünün yazılması. Görüntüden havlunun ayrılması, Bounding Box (sınırlayıcı kutu) ve X/Y boyutlarının anlık hesaplanması.
+
+**Bu hafta yaptıklarım:**
+- Görüntü işleme motorunun temelini oluşturan `detector.py` modülü kodlandı.
+- Algoritma ile havlu arka plandan (tezgahtan) başarıyla ayrıştırıldı ve nesnenin etrafına bir Bounding Box çizilmesi sağlandı.
+- Her bir video karesi (frame) için havlunun başlangıç X/Y koordinatları ve anlık Genişlik (W) / Yükseklik (H) değerleri hesaplanarak dışarı aktarıldı (return edildi).
+- Ellerin ve kolların tespit kalitesini bozmaması için görüntü işleme adımından önce opsiyonel bir HSV tabanlı ten rengi maskesi (Skin Mask) altyapısı araştırılıp sisteme uyarlanabilir hale getirildi.
+
+**Plana göre durumum:**
+- Planlanan hedef başarıyla tamamlandı. Görüntü işleme modülü stabil çalışıyor.
+
+**Karşılaştığım sorunlar / zorluklar:**
+- Gürültü ve ortam ışığı değişimleri Bounding Box'ın titremesine neden oldu. Morfolojik işlemler (Erosion/Dilation) ile maske pürüzsüzleştirilerek bu sorun aşıldı.
+
+**Gelecek hafta hedefim:**
+- Bu anlık boyut verilerini alıp, havlunun katlanma evrelerini (%15, %33 gibi) kontrol edecek Durum Makinesinin (State Machine) kodlanması.
 
 ### Hafta 2 *(Tarih: 11.04.2026 - 18.04.2026)*
 
