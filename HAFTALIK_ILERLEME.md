@@ -22,9 +22,9 @@
 | 2 | 11.04 - 18.04 | Görüntü bölütleme (segmentasyon) algoritmalarının (Canny, Sobel, Prewitt, K-Means, DBSCAN vb.) test scripti ile karşılaştırılması ve en verimli yöntemin seçilmesi. | %20 | ✅ Tamamlandı |
 | 3 | 25.04 - 02.05 | Seçilen algoritma ile `detector.py` modülünün yazılması. Görüntüden havlunun ayrılması, Bounding Box (sınırlayıcı kutu) ve X/Y boyutlarının anlık hesaplanması. | %30 | ✅ Tamamlandı |
 | 4 | 02.05 - 09.05 | Katlama adımlarını oransal (%15, %33, %50 vb.) olarak takip edecek Durum Makinesi (State Machine) mantığının `tracker.py` içerisine kodlanması. | %40 | ✅ Tamamlandı |
-| 5 | 09.05 - 16.05 | Zaman ölçüm metriklerinin sisteme entegre edilmesi. Her bir katlama aşamasının ve toplam işlemin ne kadar sürdüğünün ölçülmesi. Doğru katlama / hatalı katlama karar mantığının oluşturulması. | %50 | 🔄 Devam Ediyor |
-| 6 | 16.05 - 23.05 | `database` modülünün ayarlanması. SQLite/PostgreSQL veritabanı tablolarının (İşçi, Havlu_Islemi, Adimlar) oluşturulması ve CRUD operasyonlarının yazılması. | %60 | ⬜ Başlamadı |
-| 7 | 30.05 - 06.06 | Görüntü işleme motoru (CV Engine) ile veritabanının birbirine bağlanması. İşlenen verilerin anlık olarak veritabanına kaydedilmesi. | %70 | ⬜ Başlamadı |
+| 5 | 09.05 - 16.05 | Zaman ölçüm metriklerinin sisteme entegre edilmesi. Her bir katlama aşamasının ve toplam işlemin ne kadar sürdüğünün ölçülmesi. Doğru katlama / hatalı katlama karar mantığının oluşturulması. | %50 | ✅ Tamamlandı |
+| 6 | 16.05 - 23.05 | `database` modülünün ayarlanması. SQLite/PostgreSQL veritabanı tablolarının (İşçi, Havlu_Islemi, Adimlar) oluşturulması ve CRUD operasyonlarının yazılması. | %60 | ✅ Tamamlandı |
+| 7 | 30.05 - 06.06 | Görüntü işleme motoru (CV Engine) ile veritabanının birbirine bağlanması. İşlenen verilerin anlık olarak veritabanına kaydedilmesi. | %70 | 🔄 Devam Ediyor |
 | 8 | 06.06 - 13.06 | Web uygulamasının backend (main.py) ve frontend (HTML/CSS/JS) iskeletinin ayağa kaldırılması. `live_feed.html` üzerinden kamera/video akışının webe aktarılması. | %80 | ⬜ Başlamadı |
 | 9 | 13.06 - 20.06 | `index.html` (Dashboard) arayüzünün geliştirilmesi. Gün sonu toplam katlanan havlu sayısı ve en iyi performans gösteren işçi verilerinin grafiksel gösterimi. | %90 | ⬜ Başlamadı |
 | 10 | 20.06 - 27.06 | Sistemin uçtan uca test edilmesi, hataların (bug) giderilmesi, performans optimizasyonları ve Bitirme Projesi Raporu / Sunumu hazırlıkları. | %100 | ⬜ Başlamadı |
@@ -38,6 +38,27 @@
 > **Kullanım:** Her hafta aşağıdaki şablonu kopyalayıp doldurun. En güncel hafta en üstte olacak şekilde ekleyin.
 
 ---
+
+### Hafta 6 *(Tarih: 16.05.2026 - 23.05.2026)*
+
+**Plandaki hedef:**
+- `database` modülünün ayarlanması. SQLite/PostgreSQL veritabanı tablolarının (İşçi, Havlu_Islemi, Adimlar) oluşturulması ve CRUD operasyonlarının yazılması.
+
+**Bu hafta yaptıklarım:**
+- Projenin MVP (Minimum Viable Product) yapısına ve taşınabilirliğine en uygun veritabanı motoru olarak **SQLite** seçildi. Doğrudan SQL sorguları yazmak yerine, nesne yönelimli ve güvenli bir yapı sunan **SQLAlchemy (ORM)** kütüphanesi kullanıldı.
+- `database/db_config.py` oluşturularak lokal veritabanı (`data/app.db`) bağlantı motoru ve oturum (session) ayarları yapılandırıldı.
+- `database/models.py` modülü içerisinde, ilişkisel veritabanı standartlarına (Primary Key, Foreign Key) uygun olarak `Isci`, `HavluIslemi` ve `Adimlar` tabloları oluşturuldu.
+- `database/crud.py` dosyası yazılarak, sisteme yeni işçi ekleme, yeni işlem başlatma, adım kaydetme ve işlemi bitirme gibi temel veri manipülasyon (CRUD) fonksiyonları modüler hale getirildi.
+- Görüntü işleme motorundan (`tracker.py`) dönen anlık metriklerin (katlama süreleri, başarı/hata durumları) `main.py` üzerinden doğrudan veritabanına kaydedilmesi sağlandı.
+
+**Plana göre durumum:**
+- Planlanan hedeflere ulaşıldı. Proje takviminin oldukça önünde, güvenli bir şekilde ilerliyorum.
+
+**Karşılaştığım sorunlar / zorluklar:**
+- Görüntü işleme motorunun veritabanına attığı logları ve süre metriklerini doğrulayabilmek için `.db` dosyasının içeriğini görsel olarak inceleme ihtiyacı doğdu. Bu ihtiyaç, geliştirme ortamına "SQLite Viewer" eklentisi ve "DB Browser for SQLite" aracı entegre edilerek çözüldü; verilerin tutarlılığı arayüz üzerinden teyit edildi.
+
+**Gelecek hafta hedefim:**
+- Web uygulamasının backend (Flask veya FastAPI) ve frontend (HTML/CSS/JS) iskeletinin ayağa kaldırılması. `live_feed.html` sayfası oluşturularak, OpenCV üzerinden işlenen canlı kamera/video akışının ve anlık tespit verilerinin web tarayıcısına aktarılması çalışmalarına başlanması.
 
 ### Hafta 5 *(Tarih: 09.05.2026 - 16.05.2026)*
 
