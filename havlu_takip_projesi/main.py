@@ -11,6 +11,13 @@ Ekranda gosterilen bilgiler:
     - Ilerleme cubugu (5 adim uzerinden)
     - Hata mesaji varsa (KIRMIZI)
     - FPS gostergesi
+    - Isleme suresi (ms) ve dinamik delay bilgisi
+
+Performans Notu:
+    Video oynatma hizi Delta Time mantigi ile kontrol edilir.
+    Her karenin isleme suresi olculur ve cv2.waitKey() icin
+    dinamik bir gecikme hesaplanir. Boylece video gercek 1x
+    hizinda akar.
 
 Cikis: 'q' tusu veya video bittiginde konsola detayli rapor yazdirir.
 """
@@ -29,6 +36,10 @@ if SCRIPT_DIR not in sys.path:
 from cv_engine.detector import detect_towel
 from cv_engine.tracker import TowelTracker
 
+# Veritabani modulleri
+from database.db_config import init_db
+from database.crud import isci_ekle, islem_kaydet_toplu, gunluk_performans_raporu
+
 
 # ================================================================
 # YAPILANDIRMA
@@ -39,6 +50,9 @@ RESIZE_WIDTH = 960
 OVERLAY_ALPHA = 0.65
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 TOTAL_FOLD_STEPS = 5
+
+# Debug modu: True ise ekstra bilgiler (isleme suresi, delay) ekranda gosterilir
+DEBUG_OVERLAY = True
 
 
 # ================================================================
@@ -106,15 +120,29 @@ def draw_progress_bar(frame, x, y, w, h, current_step, total_steps,
 # ================================================================
 
 def main():
+    # ---- Veritabani Baslat ----
+    init_db()
+    varsayilan_isci_id = isci_ekle('Varsayilan Isci')
+
     cap = cv2.VideoCapture(VIDEO_SOURCE)
     if not cap.isOpened():
         print(f"HATA: Video dosyasi acilamadi: {VIDEO_SOURCE}")
         return
 
-    fps_video = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    # ---- Videonun Gercek FPS Degerini Guvenli Oku ----
+    fps_video = cap.get(cv2.CAP_PROP_FPS)
+    if fps_video is None or fps_video == 0:
+        fps_video = 30.0  # Varsayilan deger (FPS okunamazsa)
+        print("UYARI: Video FPS degeri okunamadi, varsayilan 30 FPS kullaniliyor.")
+
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    # ---- Hedef Frame Suresini Hesapla (milisaniye) ----
+    target_frame_time_ms = int(1000 / fps_video)
+
     print(f"Video: {VIDEO_SOURCE}")
     print(f"FPS: {fps_video:.1f} | Toplam Kare: {total_frames}")
+    print(f"Hedef frame suresi: {target_frame_time_ms} ms")
     print(f"Cikmak icin 'q' tusuna basin.\n")
 
     tracker = TowelTracker(confirmation_frames=3, towel_lost_frames=10)
@@ -128,6 +156,9 @@ def main():
     cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
 
     while True:
+        # ---- Delta Time: Dongu basinda zamani kaydet ----
+        start_time = time.time()
+
         ret, frame = cap.read()
         if not ret:
             break
@@ -243,10 +274,11 @@ def main():
             cv2.rectangle(frame, (0, 0), (w_frame - 1, h_frame - 1),
                           CLR_YELLOW, 2)
 
-        # -- Sag ust: FPS --
-        draw_overlay_bg(frame, w_frame - 100, 5, 95, 30)
+        # -- Sag ust: FPS ve isleme suresi --
+        info_panel_w = 160 if DEBUG_OVERLAY else 100
+        draw_overlay_bg(frame, w_frame - info_panel_w - 5, 5, info_panel_w, 55 if DEBUG_OVERLAY else 30)
         draw_text(frame, f"FPS: {display_fps:.0f}",
-                  (w_frame - 90, 25), scale=0.50, color=CLR_CYAN)
+                  (w_frame - info_panel_w, 25), scale=0.50, color=CLR_CYAN)
 
         # -- Hata / Basari cercevesi ve buyuk yazi --
         if is_error:
@@ -272,6 +304,22 @@ def main():
                       color=CLR_SUCCESS, thickness=2)
 
         # ============================================================
+        # ISLEME SURESI OLCUMU VE DINAMIK DELAY HESAPLAMA
+        # ============================================================
+        end_time = time.time()
+        processing_time_ms = int((end_time - start_time) * 1000)
+
+        # Dinamik delay: hedef frame suresinden isleme suresini cikar
+        delay = target_frame_time_ms - processing_time_ms
+        if delay <= 0:
+            delay = 1  # Minimum 1 ms (cv2.waitKey(0) sonsuz bekler)
+
+        # Debug overlay: isleme suresi ve delay bilgisini ekrana yaz
+        if DEBUG_OVERLAY:
+            draw_text(frame, f"Proc: {processing_time_ms}ms  Delay: {delay}ms",
+                      (w_frame - info_panel_w, 50), scale=0.35, color=CLR_YELLOW)
+
+        # ============================================================
         # GOSTERIM VE FPS
         # ============================================================
         cv2.imshow(WINDOW_NAME, frame)
@@ -282,17 +330,27 @@ def main():
             display_fps = 10.0 / max(now - fps_timer, 0.001)
             fps_timer = now
 
-        key = cv2.waitKey(max(1, int(1000 / fps_video))) & 0xFF
+        # Dinamik bekleme: sadece arta kalan sure kadar bekle
+        key = cv2.waitKey(delay) & 0xFF
         if key == ord('q'):
             print("\nKullanici tarafindan durduruldu (q).")
             break
 
     # ============================================================
-    # TEMIZLIK VE RAPOR
+    # TEMIZLIK, VERITABANI KAYDI VE RAPOR
     # ============================================================
     cap.release()
     cv2.destroyAllWindows()
+
+    # Tracker raporunu konsola yazdir
     print(tracker.get_report())
+
+    # Islem tamamlandiysa veritabanina kaydet
+    final_status = tracker.get_status()
+    if final_status.get('process'):
+        islem_kaydet_toplu(varsayilan_isci_id, final_status['process'])
+    else:
+        print("[DB] Islem tamamlanmadi, veritabanina kayit yapilmadi.")
 
 
 if __name__ == '__main__':
