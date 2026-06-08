@@ -14,10 +14,18 @@ Ekranda gosterilen bilgiler:
     - Isleme suresi (ms) ve dinamik delay bilgisi
 
 Performans Notu:
-    Video oynatma hizi Delta Time mantigi ile kontrol edilir.
-    Her karenin isleme suresi olculur ve cv2.waitKey() icin
-    dinamik bir gecikme hesaplanir. Boylece video gercek 1x
-    hizinda akar.
+    1. Frame Skipping (Kare Atlama): Havlu katlama yavas bir eylem
+       oldugundan, agir CV islemleri (Canny, HSV, kontur bulma) her
+       kareye degil, sadece her N. kareye uygulanir. Atlanan karelerde
+       son gecerli sonuclar (bbox, state) onbellekten cizilir.
+       Bu sayede isleme yuku ~%66 azalir.
+    2. Delta Time: Her karenin isleme suresi olculur ve cv2.waitKey()
+       icin dinamik bir gecikme hesaplanir. Kare atlama sayesinde
+       atlanan karelerde processing_time ~1ms'e duser, video gercek
+       1x hizinda akar.
+    3. Zaman Tabanli Debounce: tracker.py'daki stabilizasyon frame
+       sayisina degil gercek zamana (debounce_time) baglidir.
+       Frame skip degistiginde debounce suresi etkilenmez.
 
 Cikis: 'q' tusu veya video bittiginde konsola detayli rapor yazdirir.
 """
@@ -44,12 +52,29 @@ from database.crud import isci_ekle, islem_kaydet_toplu, gunluk_performans_rapor
 # ================================================================
 # YAPILANDIRMA
 # ================================================================
-VIDEO_SOURCE = os.path.join(SCRIPT_DIR, 'data', 'Ornek_Video.mp4')
+VIDEO_SOURCE = os.path.join(SCRIPT_DIR, 'data', 'Video1.mp4')
 WINDOW_NAME = 'Havlu Katlama Takip Sistemi'
 RESIZE_WIDTH = 960
 OVERLAY_ALPHA = 0.65
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 TOTAL_FOLD_STEPS = 5
+
+# --- Renk Filtresi Ayarlari ---
+if 'Video2' in VIDEO_SOURCE:
+    # Video2.mp4 icin gri/acik mavi havlu renk degerleri
+    HSV_LOWER = np.array([90, 10, 15])
+    HSV_UPPER = np.array([140, 255, 200])
+else:
+    # Varsayilan lacivert havlu renk degerleri
+    HSV_LOWER = np.array([95, 25, 15])
+    HSV_UPPER = np.array([135, 255, 160])
+
+# ---- Kare Atlama (Frame Skipping) Ayari ----
+# Agir CV islemleri (detector + tracker) her frame_skip karede bir
+# calistirilir. Araya dusen karelerde onceki sonuclar onbellekten cizilir.
+# Havlu katlama yavas bir eylem oldugu icin 3 ideal bir degerdir.
+# Deger arttikca performans artar, tepki suresi biraz duser.
+frame_skip = 3
 
 # Debug modu: True ise ekstra bilgiler (isleme suresi, delay) ekranda gosterilir
 DEBUG_OVERLAY = True
@@ -145,13 +170,24 @@ def main():
     print(f"Hedef frame suresi: {target_frame_time_ms} ms")
     print(f"Cikmak icin 'q' tusuna basin.\n")
 
-    tracker = TowelTracker(confirmation_frames=3, towel_lost_frames=10)
+    # Tracker: Zaman tabanli debounce ile olustur (frame sayisina bagli degil)
+    tracker = TowelTracker(confirmation_frames=3, towel_lost_frames=10,
+                           debounce_time=0.5)
 
     frame_count = 0
     fps_timer = time.perf_counter()
     display_fps = 0.0
     last_state = 0
     transition_flash_end = 0
+
+    # ---- Onbellek (Cache) Degiskenleri ----
+    # Isleme atlanan karelerde ekrandaki Bounding Box, yazi ve durum
+    # bilgilerinin kaybolmamasi / titrememesi icin son gecerli degerler
+    # burada tutulur.
+    last_bbox = None           # Son gecerli (tx, ty, tw, th) tuple
+    last_tx, last_ty = 0, 0    # Son gecerli konum
+    last_tw, last_th = 0, 0    # Son gecerli boyut
+    last_status = None         # Son gecerli tracker status dict'i
 
     cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
 
@@ -166,18 +202,45 @@ def main():
         frame = resize_proportional(frame, RESIZE_WIDTH)
         h_frame, w_frame = frame.shape[:2]
 
-        # Detector calistir
-        result = detect_towel(frame)
+        # ============================================================
+        # KARE ATLAMA (FRAME SKIPPING) + ONBELLEKLEME (CACHING)
+        # ============================================================
+        # Agir islemleri (Canny, HSV, kontur bulma vb.) sadece her
+        # frame_skip karede bir calistir.
+        # Atlanan karelerde son gecerli sonuclari (last_*) kullan.
+        # ============================================================
 
-        # Tracker'i guncelle - artik (x, y, w, h) gonderiyor
-        if result['bbox'] is not None:
-            tx, ty, tw, th = result['bbox']
-            status = tracker.update(tx, ty, tw, th)
+        if frame_count % frame_skip == 0:
+            # --- N. KARE: Detector + Tracker calistir ---
+            result = detect_towel(frame, hsv_lower=HSV_LOWER, hsv_upper=HSV_UPPER)
+
+            # Tracker'i guncelle - (x, y, w, h) gonderiyor
+            if result['bbox'] is not None:
+                tx, ty, tw, th = result['bbox']
+                status = tracker.update(tx, ty, tw, th, edges=result['edges'], mask=result['mask'], frame=result['frame'])
+            else:
+                tx, ty, tw, th = 0, 0, 0, 0
+                status = tracker.update(0, 0, 0, 0, edges=None, mask=None, frame=None)
+
+            # Detector'un cizim yapilmis frame'ini al
+            frame = result['frame']
+
+            # Sonuclari onbellege kaydet (atlanan karelerde kullanilacak)
+            last_bbox = (tx, ty, tw, th)
+            last_tx, last_ty, last_tw, last_th = tx, ty, tw, th
+            last_status = status
+
         else:
-            tx, ty, tw, th = 0, 0, 0, 0
-            status = tracker.update(0, 0, 0, 0)
+            # --- ATLANAN KARE: Sistemi yormadan onbellekteki veriyi kullan ---
+            tx, ty, tw, th = last_tx, last_ty, last_tw, last_th
+            status = last_status
 
-        frame = result['frame']
+            # Bounding Box cizimi: onbellekteki koordinatlarla dogrudan ciz
+            # (detector calismadigindan ekranda kutu kaybolmasin)
+            if last_bbox is not None and last_tw > 0 and last_th > 0:
+                cv2.rectangle(frame, (last_tx, last_ty),
+                              (last_tx + last_tw, last_ty + last_th),
+                              CLR_GREEN, 2)
 
         # ============================================================
         # OVERLAY BILGILERI

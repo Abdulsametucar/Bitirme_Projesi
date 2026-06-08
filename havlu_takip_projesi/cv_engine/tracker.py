@@ -7,9 +7,12 @@ sureleri ve dogru/yanlis sira bilgisini takip eder.
 
 Stabilizasyon (Debounce) Mantigi:
     Katlama aninda iscinin elleri kadraja girdiginde bounding box anlik
-    olarak dalgalanir. Sistem, boyutlarin belirli bir sure (stable_frames)
+    olarak dalgalanir. Sistem, boyutlarin belirli bir SURE (debounce_time)
     boyunca %2'lik tolerans bandinda sabit kalmasini bekler. Ancak
     stabilize olmus boyutlar uzerinden karar verir.
+    Bu zaman-tabanli (time-based) yaklasim sayesinde main.py hangi FPS
+    veya frame_skip degeriyle calisirsa calissin, bekleme suresi gercek
+    zamanla senkronize kalir.
 
 Katlama Senaryosu (5 Adim):
     State 0 -> Baslangic (Havlu Acik)     : Ilk bbox kaydedilir
@@ -89,15 +92,16 @@ class TowelTracker:
 
     def __init__(self, transitions=None, stability_tolerance=0.15,
                  confirmation_frames=3, towel_lost_frames=10,
-                 stable_frames=15, stable_tolerance=0.02):
+                 debounce_time=0.5, stable_tolerance=0.02):
         """
         Args:
             transitions:         Gecis tanimlari listesi.
             stability_tolerance: Eksen hata kontrolu toleransi.
             confirmation_frames: State gecisi icin gereken ardisik frame.
             towel_lost_frames:   Havlu kayip sayilmasi icin bos frame sayisi.
-            stable_frames:       Debounce: boyutlarin sabit kalmasi gereken
-                                 ardisik frame sayisi (varsayilan 15).
+            debounce_time:       Debounce: boyutlarin sabit kalmasi gereken
+                                 minimum SURE (saniye, varsayilan 0.5).
+                                 Frame sayisina degil gercek zamana baglidir.
             stable_tolerance:    Debounce: sabit kabul edilecek max degisim
                                  orani (varsayilan 0.02 = %2).
         """
@@ -105,7 +109,7 @@ class TowelTracker:
         self.stability_tolerance = stability_tolerance
         self.confirmation_frames = confirmation_frames
         self.towel_lost_frames = towel_lost_frames
-        self.stable_frames = stable_frames
+        self.debounce_time = debounce_time
         self.stable_tolerance = stable_tolerance
         self.reset()
 
@@ -159,12 +163,13 @@ class TowelTracker:
         self._state_entry_w_ratio = 1.0
         self._state_entry_h_ratio = 1.0
 
-        # ── STABILIZASYON (DEBOUNCE) ──
+        # ── STABILIZASYON (DEBOUNCE) - ZAMAN TABANLI ──
         # Boyutlar stabil olana kadar karar verilmez.
-        # _stable_count: ard arda kac frame boyunca boyutlar sabit kaldi
+        # _stable_since: boyutlarin tolerans icinde kalmaya basladigi zaman
+        #                (time.time() degeri). None = henuz sabit degil.
         # _stable_ref_*: stabilizasyon referans degerleri
         # _is_stable: mevcut olcumlerin stabil oldugu flag
-        self._stable_count = 0
+        self._stable_since = None      # Zaman damgasi (saniye)
         self._stable_ref_x = 0
         self._stable_ref_y = 0
         self._stable_ref_w = 0
@@ -179,7 +184,7 @@ class TowelTracker:
         self.errors = []
         self.steps = []
 
-    def update(self, x, y, w, h):
+    def update(self, x, y, w, h, edges=None, mask=None, frame=None):
         """
         Her frame'de cagrilir.
 
@@ -198,37 +203,43 @@ class TowelTracker:
         now_perf = time.perf_counter()
         now_dt = datetime.now()
 
+        now_time = time.time()  # Zaman tabanli debounce icin
+
         if not w or not h:
-            self._stable_count = 0
+            self._stable_since = None
             self._is_stable = False
             return self._handle_towel_lost(now_perf, now_dt)
 
         self._lost_count = 0
 
-        # ── STABILIZASYON FILTRESI ──
-        # Boyutlarin referans degerlere gore %2 icinde olup olmadigini kontrol et
+        # ── STABILIZASYON FILTRESI (ZAMAN TABANLI) ──
+        # Boyutlarin referans degerlere gore %2 icinde olup olmadigini kontrol et.
+        # Frame sayisi yerine gecen SUREYE bakilir (debounce_time saniye).
         if self._stable_ref_w > 0 and self._stable_ref_h > 0:
             w_change = abs(w - self._stable_ref_w) / self._stable_ref_w
             h_change = abs(h - self._stable_ref_h) / self._stable_ref_h
 
             if w_change <= self.stable_tolerance and h_change <= self.stable_tolerance:
-                # Boyutlar referansa yakin -> stabil sayaci artir
-                self._stable_count += 1
+                # Boyutlar referansa yakin -> zamani kontrol et
+                if self._stable_since is None:
+                    # Stabilizasyon yeni basliyor, zamani kaydet
+                    self._stable_since = now_time
             else:
-                # Boyutlar degisti -> yeni referans baslat
+                # Boyutlar degisti -> yeni referans ve zaman damgasi baslat
                 self._stable_ref_x, self._stable_ref_y = x, y
                 self._stable_ref_w, self._stable_ref_h = w, h
-                self._stable_count = 1
+                self._stable_since = now_time
                 self._is_stable = False
         else:
             # Ilk olcum -> referans olarak kaydet
             self._stable_ref_x, self._stable_ref_y = x, y
             self._stable_ref_w, self._stable_ref_h = w, h
-            self._stable_count = 1
+            self._stable_since = now_time
             self._is_stable = False
 
-        # Stabil mi? (yeterli frame boyunca sabit kaldi)
-        if self._stable_count >= self.stable_frames:
+        # Stabil mi? (debounce_time saniye boyunca sabit kaldi)
+        if (self._stable_since is not None and
+                (now_time - self._stable_since) >= self.debounce_time):
             self._is_stable = True
             self._stable_x, self._stable_y = x, y
             self._stable_w, self._stable_h = w, h
@@ -267,7 +278,7 @@ class TowelTracker:
                     if self._confirm_count >= self.confirmation_frames:
                         self._do_transition(sx, sy, sw, sh,
                                             w_ratio, h_ratio,
-                                            now_perf, now_dt)
+                                            now_perf, now_dt, edges, mask, frame)
                 else:
                     self._direction_error_count += 1
                     if self._direction_error_count >= self.confirmation_frames:
@@ -480,6 +491,100 @@ class TowelTracker:
 
         return True
 
+    def _check_internal_fold_line(self, x, y, w, h, edges, mask, expected_direction):
+        """Havlunun ic kisminda katlama yuzey cizgisi var mi kontrol eder."""
+        if expected_direction != 'right_in':
+            return False
+            
+        import cv2
+        import numpy as np
+        
+        inner_edges = cv2.bitwise_and(edges, mask)
+        
+        # Sagdan sola katlama yapildigi icin sag kismi (genisligin %40'i) kontrol et
+        right_x = int(x + w * 0.6)
+        sub_edges = inner_edges[y:y+h, right_x:x+w]
+        
+        if sub_edges.size == 0:
+            return False
+            
+        # Duz, uzun dikey cizgileri aramak (Doku/tuylerin yarattigi puruzleri ayiklamak icin)
+        # minLineLength = havlu yuksekliginin %30'u kadar uzun olmali
+        min_len = h * 0.3
+        lines = cv2.HoughLinesP(sub_edges, 1, np.pi/180, threshold=40, 
+                                minLineLength=min_len, maxLineGap=20)
+                                
+        if lines is not None and len(lines) > 0:
+            return True
+            
+        return False
+
+    def _fire_fold_layer_error(self, perf_time, dt_time):
+        """One katlama hatasi firlat ve islemi durdur."""
+        msg = ("HATALI KATLAMA: 1. Adimda havlu arkaya degil, "
+               "ONE katlandi (Ic kenar cizgisi tespit edildi).")
+        self.errors.append(msg)
+        self.is_error = True
+        self.completed = True
+        self._perf_process_end = perf_time
+        self.process_end_time = dt_time
+        self._save_current_state_duration(perf_time)
+
+    def _check_horizontal_fold_line(self, x, y, w, h, frame, mask, expected_direction):
+        """State 2 icin havlunun ustten ice degil disari katlandigini (yatay cizgi ile) dogrular."""
+        if expected_direction != 'top_in':
+            return True
+            
+        import cv2
+        import numpy as np
+        
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        roi_gray = gray[y:y+h, x:x+w]
+        
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        cl1 = clahe.apply(roi_gray)
+        
+        roi_edges = cv2.Canny(cv2.GaussianBlur(cl1, (5,5), 0), 20, 60)
+        
+        # Elleri ve cildi haric tutmak icin maskeyi uygula
+        roi_mask = mask[y:y+h, x:x+w]
+        masked_edges = cv2.bitwise_and(roi_edges, roi_mask)
+        
+        top_y = int(h * 0.3)
+        bottom_y = int(h * 0.7)
+        left_x = int(w * 0.1)
+        right_x = int(w * 0.9)
+        
+        sub_edges = masked_edges[top_y:bottom_y, left_x:right_x]
+        
+        min_len = w * 0.15
+        lines = cv2.HoughLinesP(sub_edges, 1, np.pi/180, threshold=20, 
+                                minLineLength=min_len, maxLineGap=40)
+                                
+        horizontal_count = 0
+        if lines is not None:
+            for line in lines:
+                x1, y1, x2, y2 = line[0]
+                angle = np.abs(np.arctan2(y2 - y1, x2 - x1) * 180.0 / np.pi)
+                if angle < 25 or angle > 155:
+                    horizontal_count += 1
+                    
+        # Test sonuclarina gore Arkaya=66, One=140-159 -> Esik deger: 100
+        if horizontal_count > 100:
+            return True # Cizgi bulundu, katlama dogru (One/Disariya)
+        return False # Cizgi bulunamadi, katlama hatali (Arkaya/Iceriye)
+
+    def _fire_horizontal_fold_error(self, perf_time, dt_time):
+        """Arkaya katlama hatasi firlat ve islemi durdur."""
+        msg = ("HATALI KATLAMA: 2. Adimda havlu one degil, "
+               "ARKAYA/ICERIYE katlandi (Yatay katlama izi bulunamadi).")
+        self.errors.append(msg)
+        self.is_error = True
+        self.completed = True
+        self._perf_process_end = perf_time
+        self.process_end_time = dt_time
+        self._save_current_state_duration(perf_time)
+
     def _fire_direction_error(self, x, y, w, h, transition, perf_time, dt_time):
         """Yanlis yon hatasi firlat ve islemi durdur."""
         direction = transition.get('expected_direction', '?')
@@ -510,8 +615,20 @@ class TowelTracker:
         self.process_end_time = dt_time
         self._save_current_state_duration(perf_time)
 
-    def _do_transition(self, x, y, w, h, w_ratio, h_ratio, perf_time, dt_time):
+    def _do_transition(self, x, y, w, h, w_ratio, h_ratio, perf_time, dt_time, edges=None, mask=None, frame=None):
         """Bir sonraki state'e gec."""
+        # 1. State icin dikey ic kenar kontrolu (One katlama hatasi)
+        if self.current_state == 0 and edges is not None and mask is not None:
+            if self._check_internal_fold_line(x, y, w, h, edges, mask, 'right_in'):
+                self._fire_fold_layer_error(perf_time, dt_time)
+                return
+
+        # 2. State icin yatay ic kenar kontrolu (Arkaya katlama hatasi)
+        if self.current_state == 1 and frame is not None and mask is not None:
+            if not self._check_horizontal_fold_line(x, y, w, h, frame, mask, 'top_in'):
+                self._fire_horizontal_fold_error(perf_time, dt_time)
+                return
+
         self._save_current_state_duration(perf_time)
 
         old_state = self.current_state

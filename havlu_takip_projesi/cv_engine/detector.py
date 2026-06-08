@@ -154,7 +154,9 @@ def detect_towel(frame,
                  dbscan_eps=8,
                  dbscan_min_samples=20,
                  dbscan_downsample=4,
-                 use_skin_filter=True):
+                 use_skin_filter=True,
+                 hsv_lower=None,
+                 hsv_upper=None):
     """
     Hibrit Havlu Tespit Algoritmasi (HSV + Ten Filtresi + DBSCAN + Canny)
 
@@ -182,15 +184,16 @@ def detect_towel(frame,
     total_area = h_img * w_img
 
     # =============================================================
-    # 1. HSV RENK FILTRESI - Koyu mavi/lacivert hedefle
+    # 1. HSV RENK FILTRESI - Havluyu hedefle
     # =============================================================
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-    # Lacivert havlu: Hue=~95-135 (mavi araligi),
-    #   dusuk-orta Saturation, dusuk-orta Value
-    lower_blue = np.array([95, 25, 15])
-    upper_blue = np.array([135, 255, 160])
-    color_mask = cv2.inRange(hsv, lower_blue, upper_blue)
+    if hsv_lower is None:
+        hsv_lower = np.array([95, 25, 15])
+    if hsv_upper is None:
+        hsv_upper = np.array([135, 255, 160])
+        
+    color_mask = cv2.inRange(hsv, hsv_lower, hsv_upper)
 
     # =============================================================
     # 1b. TEN RENGI FILTRESI - Iscinin ellerini cikar

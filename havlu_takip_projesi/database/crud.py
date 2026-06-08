@@ -355,3 +355,70 @@ def gunluk_performans_raporu() -> dict:
 
     finally:
         session.close()
+
+
+def genel_dashboard_raporu() -> dict:
+    """
+    Tüm zamanların genel durumunu ve son işlem adımlarını içeren rapor.
+    """
+    session = get_session()
+    try:
+        # Toplam işlem (kullanıcının isteğine göre havlu_islemleri son id'si veya kayıt sayısı)
+        toplam_islem = session.query(func.max(HavluIslemi.id)).scalar() or 0
+        
+        # Hatalı
+        hatali_islem = session.query(func.count(HavluIslemi.id)).filter(HavluIslemi.durum == 'Hatali').scalar() or 0
+        
+        # Başarılı (Başarı oranı hesabı için)
+        basarili_islem = session.query(func.count(HavluIslemi.id)).filter(HavluIslemi.durum == 'Basarili').scalar() or 0
+        
+        # Başarı Oranı
+        hesaplanan_toplam = basarili_islem + hatali_islem
+        if hesaplanan_toplam > 0:
+            basari_orani = round((basarili_islem / hesaplanan_toplam) * 100, 1)
+        else:
+            basari_orani = 0.0
+            
+        # Ortalama süre
+        ortalama_sure = session.query(func.avg(HavluIslemi.toplam_sure_saniye)).filter(HavluIslemi.toplam_sure_saniye > 0).scalar() or 0.0
+        ortalama_sure = round(ortalama_sure, 1)
+        
+        # İşçi Performansları (Adımlar -> İslem -> Isci sırasıyla)
+        # Son eklenen 20 adımı listeleyelim
+        son_adimlar_sorgu = (
+            session.query(Adim, HavluIslemi, Isci)
+            .join(HavluIslemi, Adim.islem_id == HavluIslemi.id)
+            .join(Isci, HavluIslemi.isci_id == Isci.id)
+            .order_by(Adim.id.desc())
+            .limit(20)
+            .all()
+        )
+        
+        adim_listesi = []
+        for adim, islem, isci in son_adimlar_sorgu:
+            adim_listesi.append({
+                'isci_ad_soyad': isci.ad_soyad,
+                'adim_adi': adim.adim_adi,
+                'gecen_sure_saniye': adim.gecen_sure_saniye
+            })
+            
+        return {
+            'toplam_islem': toplam_islem,
+            'hatali': hatali_islem,
+            'basari_orani': basari_orani,
+            'ortalama_sure_saniye': ortalama_sure,
+            'son_adimlar': adim_listesi
+        }
+
+    except Exception as e:
+        print(f"[DB HATA] genel_dashboard_raporu: {e}")
+        return {
+            'toplam_islem': 0,
+            'hatali': 0,
+            'basari_orani': 0.0,
+            'ortalama_sure_saniye': 0.0,
+            'son_adimlar': []
+        }
+
+    finally:
+        session.close()
