@@ -1,22 +1,91 @@
 document.addEventListener('DOMContentLoaded', () => {
-    
+
+    let successChart = null;
+    let gaugeChart = null;
+
+    function initCharts() {
+        // Doughnut Chart (İşlem Başarı Durumu)
+        const successCtx = document.getElementById('successChart').getContext('2d');
+        successChart = new Chart(successCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Başarılı', 'Hatalı'],
+                datasets: [{
+                    data: [0, 0],
+                    backgroundColor: ['#198754', '#dc3545'],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: '#e0e0e0', font: { family: 'Inter' } } }
+                },
+                cutout: '75%'
+            }
+        });
+
+        // Gauge Chart (Yarım-Doughnut Ortalama Süre)
+        const gaugeCtx = document.getElementById('gaugeChart').getContext('2d');
+        gaugeChart = new Chart(gaugeCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Ortalama Süre', 'Hedef Süre (Fark)'],
+                datasets: [{
+                    data: [0, 15], // 15 saniye hedef varsayalım
+                    backgroundColor: ['#0dcaf0', 'rgba(255,255,255,0.05)'],
+                    borderWidth: 0,
+                    circumference: 180,
+                    rotation: -90
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: true }
+                },
+                cutout: '80%'
+            }
+        });
+    }
+
     const updateStats = () => {
         fetch('/api/stats')
             .then(response => response.json())
             .then(data => {
                 // DOM Elements
-                const totalOpsEl = document.getElementById('total_ops');
-                const successRateEl = document.getElementById('success_rate');
-                const avgTimeEl = document.getElementById('avg_time');
-                const totalErrorsEl = document.getElementById('total_errors');
+                const chartTotalOpsEl = document.getElementById('chart_total_ops');
+                const chartAvgTimeEl = document.getElementById('chart_avg_time');
                 const lastUpdatedEl = document.getElementById('last_updated');
                 const tableBody = document.getElementById('worker_table_body');
 
-                // Update Overview Cards with flash animation if value changed
-                updateValueWithAnimation(totalOpsEl, data.toplam_islem.toString());
-                updateValueWithAnimation(successRateEl, `%${data.basari_orani}`);
-                updateValueWithAnimation(avgTimeEl, `${data.ortalama_sure_saniye}s`);
-                updateValueWithAnimation(totalErrorsEl, data.hatali.toString());
+                // Update Overview Values in Chart Headers
+                updateValueWithAnimation(chartTotalOpsEl, data.toplam_islem.toString());
+                updateValueWithAnimation(chartAvgTimeEl, `${data.ortalama_sure_saniye}s`);
+
+                // Update Charts
+                if (successChart) {
+                    successChart.data.datasets[0].data = [data.basarili, data.hatali];
+                    // Basari oranini ortasina veya tooltip'e ekleyebiliriz. ChartJS update cagrilir
+                    successChart.update();
+                }
+
+                if (gaugeChart) {
+                    let avg = data.ortalama_sure_saniye;
+                    let target = 15.0; // optimum 15 sn dedik
+                    // Eger ortalama sure hedeften buyukse, kirmizi yapalim, degilse mavi
+                    let color = avg > target ? '#dc3545' : '#0dcaf0';
+                    let remaining = target - avg;
+                    if (remaining < 0) remaining = 0; // Eger target'i gectiysek full dolsun
+                    gaugeChart.data.datasets[0].backgroundColor[0] = color;
+                    gaugeChart.data.datasets[0].data = [avg, Math.max(target - avg, target * 0.1)]; 
+                    // İkinci parametre sadece boslugu gostermek icindir.
+                    gaugeChart.update();
+                }
 
                 // Update Last Updated Text
                 const now = new Date();
@@ -24,11 +93,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Update Worker Table
                 tableBody.innerHTML = ''; // Clear current rows
-                
+
                 if (data.son_adimlar && data.son_adimlar.length > 0) {
                     data.son_adimlar.forEach(adim => {
                         const tr = document.createElement('tr');
-                        
+
                         tr.innerHTML = `
                             <td class="ps-3 fw-medium">
                                 <div class="d-flex align-items-center">
@@ -62,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Helper to animate value changes
     function updateValueWithAnimation(element, newValue) {
-        if (element.innerText !== newValue) {
+        if (element && element.innerText !== newValue) {
             element.innerText = newValue;
             element.classList.remove('value-updated');
             // Trigger reflow to restart animation
@@ -72,6 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Initial fetch
+    initCharts();
     updateStats();
 
     // Fetch every 3 seconds

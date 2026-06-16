@@ -20,19 +20,24 @@ app = Flask(__name__)
 # ================================================================
 # YAPILANDIRMA
 # ================================================================
-VIDEO_SOURCE = os.path.join(SCRIPT_DIR, 'data', '1.hatali_video.mp4')
+VIDEO_PLAYLIST = [
+    os.path.join(SCRIPT_DIR, 'data', 'Video1.mp4'),
+    os.path.join(SCRIPT_DIR, 'data', 'Video2.mp4'),
+    os.path.join(SCRIPT_DIR, 'data', '1.hatali_video.mp4'),
+    os.path.join(SCRIPT_DIR, 'data', '2.hatali_video.mp4')
+]
+
 RESIZE_WIDTH = 960
 OVERLAY_ALPHA = 0.65
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 TOTAL_FOLD_STEPS = 5
 
 # --- Renk Filtresi Ayarlari ---
-if 'Video2' in VIDEO_SOURCE:
-    HSV_LOWER = np.array([90, 10, 15])
-    HSV_UPPER = np.array([140, 255, 200])
-else:
-    HSV_LOWER = np.array([95, 25, 15])
-    HSV_UPPER = np.array([135, 255, 160])
+def get_hsv_limits(video_source):
+    if 'Video2' in video_source:
+        return np.array([90, 10, 15]), np.array([140, 255, 200])
+    else:
+        return np.array([95, 25, 15]), np.array([135, 255, 160])
 
 frame_skip = 3
 DEBUG_OVERLAY = True
@@ -89,7 +94,11 @@ def draw_progress_bar(frame, x, y, w, h, current_step, total_steps, bg_color=CLR
 # GENERATOR (VIDEO STREAM)
 # ================================================================
 def generate_frames():
-    cap = cv2.VideoCapture(VIDEO_SOURCE)
+    playlist_index = 0
+    current_video = VIDEO_PLAYLIST[playlist_index]
+    hsv_lower, hsv_upper = get_hsv_limits(current_video)
+    
+    cap = cv2.VideoCapture(current_video)
     
     fps_video = cap.get(cv2.CAP_PROP_FPS)
     if fps_video is None or fps_video == 0:
@@ -112,21 +121,40 @@ def generate_frames():
         start_time = time.time()
         ret, frame = cap.read()
         
-        # Video bitince durdur
+        # Video bitince sıradaki videoya geç
         if not ret:
-            print("[INFO] Video bitti, islem sonlandiriliyor.")
+            print(f"[INFO] Video bitti: {current_video}. Siradaki videoya geciliyor...")
             # DB'ye kaydet 
             final_status = tracker.get_status()
             if final_status.get('process') and not getattr(tracker, '_db_saved', False):
                 islem_kaydet_toplu(VARSAYILAN_ISCI_ID, final_status['process'])
                 tracker._db_saved = True
-            break
+            
+            # Sonraki videoyu ayarla
+            playlist_index = (playlist_index + 1) % len(VIDEO_PLAYLIST)
+            current_video = VIDEO_PLAYLIST[playlist_index]
+            hsv_lower, hsv_upper = get_hsv_limits(current_video)
+            
+            cap.release()
+            cap = cv2.VideoCapture(current_video)
+            
+            fps_video = cap.get(cv2.CAP_PROP_FPS)
+            if fps_video is None or fps_video == 0:
+                fps_video = 30.0
+            target_frame_time_ms = int(1000 / fps_video)
+            
+            tracker = TowelTracker(confirmation_frames=3, towel_lost_frames=10, debounce_time=0.5)
+            frame_count = 0
+            last_bbox = None
+            last_tx, last_ty, last_tw, last_th = 0, 0, 0, 0
+            last_status = None
+            continue
 
         frame = resize_proportional(frame, RESIZE_WIDTH)
         h_frame, w_frame = frame.shape[:2]
 
         if frame_count % frame_skip == 0:
-            result = detect_towel(frame, hsv_lower=HSV_LOWER, hsv_upper=HSV_UPPER)
+            result = detect_towel(frame, hsv_lower=hsv_lower, hsv_upper=hsv_upper)
             if result['bbox'] is not None:
                 tx, ty, tw, th = result['bbox']
                 status = tracker.update(tx, ty, tw, th, edges=result['edges'], mask=result['mask'], frame=result['frame'])

@@ -404,6 +404,7 @@ def genel_dashboard_raporu() -> dict:
             
         return {
             'toplam_islem': toplam_islem,
+            'basarili': basarili_islem,
             'hatali': hatali_islem,
             'basari_orani': basari_orani,
             'ortalama_sure_saniye': ortalama_sure,
@@ -414,6 +415,7 @@ def genel_dashboard_raporu() -> dict:
         print(f"[DB HATA] genel_dashboard_raporu: {e}")
         return {
             'toplam_islem': 0,
+            'basarili': 0,
             'hatali': 0,
             'basari_orani': 0.0,
             'ortalama_sure_saniye': 0.0,
